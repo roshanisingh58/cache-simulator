@@ -1,7 +1,6 @@
-/* NAME:- YASH KUSHWAHA        COURSE:- COMPUTER ARCHITECTURE        ROLL NUMBER:- 112215208*/        
+/* NAME:- Roshani Singh        COURSE:- Information Technology       ROLL NUMBER:- 58 */
 #include <iostream>
-#include<fstream>
-#include <cassert>
+#include <fstream>
 #include <cstdlib>
 #include <ctime>
 
@@ -11,119 +10,160 @@
 #define WRITE 1
 
 using namespace std;
-int LRUCtr=0;
 
-class Memory{
-	public: 
-	  int readblock(int Address){return 1;}
-	  int writeblock(int Address){return 1;}
+static int LRUCtr = 1;
+
+class Memory {
+public:
+    int readblock(unsigned int /*Address*/) { return 1; }
+    int writeblock(unsigned int /*Address*/) { return 1; }
 };
 
 Memory M;
 
 class Cache {
-	private:
-		int set, asso, LS;
-		int hit_counter,miss_counter;
-		int **TAG, **LRU;
-	        bool **Dirty;	
-	public:
-		int get_hit(void){return hit_counter;}
-		int get_miss(void){return miss_counter;}
-		Cache(){}
-		void CacheInit( int sets, int associativity, int LineSize ) {
-			int i, j;
-			TAG = new int*[sets];
-			LRU = new int*[sets];
-			Dirty = new bool*[sets];
-			for(i = 0; i < sets; i++){
-				TAG[i] = new int [associativity];
-				LRU[i] = new int [associativity];
-				Dirty[i] = new bool [associativity];
-				
-			}
-			/* Initialize tag to be -1 */
-			for(i=0;i<sets;i++)
-				for(j=0;j<associativity;j++) TAG[i][j]=-1;
-			cout << TAG[5][3] << endl;
-			asso = associativity; set = sets; LS = LineSize;
-			hit_counter=miss_counter=0;
-		}
-		~Cache(void){
-			delete[] TAG;
-		}
-		int Access(unsigned int Address, bool RW) {
-			int i, lru_index;
-			int offset = Address % LS;
-			int index = (Address/LS) % set;
-			int Tag = (Address/LS)/set;
-			/*if hit*/
-			for(i = 0; i < asso; i++) //In real system, tag matching happens in parallel
-				if( TAG[index][i] == Tag) {
-					hit_counter++;
-					LRU[index][i]=LRUCtr++;
-					if (RW==WRITE) Dirty[index][i]=1;			
-					return HIT;
-				}
-			miss_counter++;
-			/*miss*/
-			lru_index =0; // least recently used policy for replacement
-			for(i = 1; i < asso; i++){
-			    if(LRU[index][i]<LRU[index][lru_index]) lru_index=i;		
-			}
-			M.readblock(Address); //Read Data Block from memory
-			if (Dirty[lru_index][i]) {
-				int OTag=TAG[index][lru_index]; //Writeback the Data to memory
-				if(OTag>0) M.writeblock((OTag*LS*set+index*LS));
-			}
-			TAG[index][lru_index] = Tag;
+private:
+    int sets = 0, asso = 0, lineSize = 0;
+    int hit_counter = 0, miss_counter = 0;
 
-			return MISS;
-		} 
+    int **TAG = nullptr;
+    int **LRU = nullptr;
+    bool **Dirty = nullptr;
+
+public:
+    int get_hit() const { return hit_counter; }
+    int get_miss() const { return miss_counter; }
+
+    Cache() = default;
+
+    void CacheInit(int s, int a, int ls) {
+        sets = s;
+        asso = a;
+        lineSize = ls;
+        hit_counter = 0;
+        miss_counter = 0;
+
+        TAG = new int*[sets];
+        LRU = new int*[sets];
+        Dirty = new bool*[sets];
+
+        for (int i = 0; i < sets; i++) {
+            TAG[i] = new int[asso];
+            LRU[i] = new int[asso];
+            Dirty[i] = new bool[asso];
+
+            for (int j = 0; j < asso; j++) {
+                TAG[i][j] = -1;        // empty
+                LRU[i][j] = 0;         // not used yet
+                Dirty[i][j] = false;   // clean
+            }
+        }
+    }
+
+    ~Cache() {
+        if (TAG) {
+            for (int i = 0; i < sets; i++) delete[] TAG[i];
+            delete[] TAG;
+        }
+        if (LRU) {
+            for (int i = 0; i < sets; i++) delete[] LRU[i];
+            delete[] LRU;
+        }
+        if (Dirty) {
+            for (int i = 0; i < sets; i++) delete[] Dirty[i];
+            delete[] Dirty;
+        }
+    }
+
+    int Access(unsigned int Address, bool RW) {
+        int index = (Address / lineSize) % sets;
+        int tag = (Address / lineSize) / sets;
+
+        // HIT check (parallel in real cache)
+        for (int i = 0; i < asso; i++) {
+            if (TAG[index][i] == tag) {
+                hit_counter++;
+                LRU[index][i] = LRUCtr++;
+                if (RW == WRITE) Dirty[index][i] = true;
+                return HIT;
+            }
+        }
+
+        // MISS
+        miss_counter++;
+
+        // Find LRU line (least recently used)
+        int lru_index = 0;
+        for (int i = 1; i < asso; i++) {
+            if (LRU[index][i] < LRU[index][lru_index]) lru_index = i;
+        }
+
+        // If victim is dirty, write back old block
+        if (Dirty[index][lru_index] && TAG[index][lru_index] != -1) {
+            int oldTag = TAG[index][lru_index];
+            unsigned int oldAddr = (unsigned int)(oldTag * sets * lineSize + index * lineSize);
+            M.writeblock(oldAddr);
+        }
+
+        // Bring new block
+        M.readblock(Address);
+
+        TAG[index][lru_index] = tag;
+        LRU[index][lru_index] = LRUCtr++;
+        Dirty[index][lru_index] = (RW == WRITE);
+
+        return MISS;
+    }
 };
 
+int main() {
+    const unsigned int MaxAddress = 1u << 30;
 
+    Cache L;
+    L.CacheInit(128, 4, 64);
 
-int main()
-{
-	int hit;
-	unsigned int Address;
-	int j, CPUCycle, i =0;
-	bool RW;
-	int MaxAddress=1<<30;
-	
+    ofstream TF("tracefile.txt");
+    if (!TF) {
+        cout << "Error: tracefile.txt cannot be created.\n";
+        return 0;
+    }
 
-	Cache L; 
-	ofstream TF("tracefile.txt");
+    srand((unsigned)time(NULL));
+    unsigned int Address = rand() % MaxAddress;
 
-	L.CacheInit(128, 4, 64);
-	srand(time(NULL));
-	Address = rand()%MaxAddress;
-	for(CPUCycle = 0; CPUCycle < 5000; CPUCycle=CPUCycle+4) {
-		if ((rand()%100) <20)
-			Address = rand()%MaxAddress; //20% time it jump to new address
-		else Address = Address+4; // 80% time it goes to next word
-		if ((rand()%100)<20) RW=WRITE; else RW=READ;
-		hit = L.Access(Address,RW);
-		TF<<CPUCycle<<" "<<std::hex<<Address<<" "<<std::dec<<RW<<endl;
-	}/*end for loop*/
-	cout<<"\nL: hit "<<L.get_hit()<<" miss "<<L.get_miss();
-	int totalAccesses = L.get_hit() + L.get_miss();
-	double hitRate = (double)L.get_hit() / totalAccesses;
-	double missRate = (double)L.get_miss() / totalAccesses;
-	const int HIT_TIME = 2;       // In cycles
-	const int MISS_PENALTY = 400; // In cycles
-	double amat = hitRate * HIT_TIME + missRate * MISS_PENALTY;
-	double latencyReduction = ((400.0 - amat) / 400.0) * 100.0;
-	cout << "\n================ Cache Simulation Results ================\n";
-	cout << "Total Accesses     : " << totalAccesses << endl;
-	cout << "Cache Hits         : " << L.get_hit() << endl;
-	cout << "Cache Misses       : " << L.get_miss() << endl;
-	cout << "Hit Rate           : " << hitRate * 100 << " %" << endl;
-	cout << "Miss Rate          : " << missRate * 100 << " %" << endl;
-	cout << "AMAT               : " << amat << " cycles" << endl;
-	cout << "Latency Reduction  : " << latencyReduction << " %" << endl;
-	cout << "==========================================================\n";
-	cout<<"\n\nMy work is done\n\n";
-	return 0;
+    for (int CPUCycle = 0; CPUCycle < 5000; CPUCycle += 4) {
+        if ((rand() % 100) < 20)
+            Address = rand() % MaxAddress;   // 20% jump
+        else
+            Address += 4;                    // 80% sequential
+
+        bool RW = ((rand() % 100) < 20) ? WRITE : READ;
+
+        int hit = L.Access(Address, RW);
+
+        TF << CPUCycle << " " << std::hex << Address << std::dec << " " << RW
+           << " " << (hit == HIT ? "HIT" : "MISS") << "\n";
+    }
+
+    int totalAccesses = L.get_hit() + L.get_miss();
+    double hitRate = totalAccesses ? (double)L.get_hit() / totalAccesses : 0.0;
+    double missRate = totalAccesses ? (double)L.get_miss() / totalAccesses : 0.0;
+
+    const int HIT_TIME = 2;
+    const int MISS_PENALTY = 400;
+
+    double amat = hitRate * HIT_TIME + missRate * MISS_PENALTY;
+    double latencyReduction = ((400.0 - amat) / 400.0) * 100.0;
+
+    cout << "\n================ Cache Simulation Results ================\n";
+    cout << "Total Accesses     : " << totalAccesses << "\n";
+    cout << "Cache Hits         : " << L.get_hit() << "\n";
+    cout << "Cache Misses       : " << L.get_miss() << "\n";
+    cout << "Hit Rate           : " << hitRate * 100 << " %\n";
+    cout << "Miss Rate          : " << missRate * 100 << " %\n";
+    cout << "AMAT               : " << amat << " cycles\n";
+    cout << "Latency Reduction  : " << latencyReduction << " %\n";
+    cout << "==========================================================\n";
+    cout << "\nMy work is done\n";
+    return 0;
 }
