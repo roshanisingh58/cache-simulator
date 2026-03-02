@@ -1,10 +1,33 @@
-My code and aprroach involves designing and implementing a cache simulator in C++ with the following specifications: 
-a cache with 256 sets, 4-way set-associative, and a 64-byte line/block size. 
-The simulator is built to handle 32-bit physical/memory addresses by dividing them into three parts: 
-Tag, Index, and Offset, with 18, 8, and 6 bits respectively. 
-The primary focus of the project is to simulate the cache structure without storing actual data, ensuring efficient tag comparison, block access, and cache miss handling using the Miss Status Holding Register (MSHR).
+**Project Overview**
 
-The code supports following features:-
-- Tag comparison and block access in the cache happened in parallel for all the blocks of the selected index.
-- LRU replacement policy for cache block replacement.
-- Cache miss under a cache miss using Miss Status Holding Register (MSHR). 
+This project implements a Cache Simulator in C++.
+It simulates a 256-set, 4-way set-associative cache with a 64-byte block size.
+The simulator processes 32-bit memory addresses by dividing them into:
+
+- Tag
+
+ - Index
+
+ - Offset
+
+The goal is to simulate cache behavior including hits, misses, and block replacement without storing actual data.
+
+**Features**
+
+- 4-way Set Associative Cache
+
+- LRU (Least Recently Used) Replacement Policy
+
+- Parallel Tag Comparison
+
+- Miss handling using MSHR (Miss Status Holding Register)
+
+
+
+The simulator reads memory access traces from:
+
+tracefile.txt
+
+dram_tracefile.txt
+
+Each line represents a memory access address used to simulate cache operations.
